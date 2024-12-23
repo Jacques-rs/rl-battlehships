@@ -100,7 +100,7 @@ class BattleshipsEnv:
 
         # Check if the action hits a boat
         if any((x, y) in positions for positions in self.boat_positions.values()):
-            reward = self._step_reward_structure_(x, y)
+            reward = self._compute_reward_for_hit(x, y)
         else:
             # Action misses
             logging.info(f"Miss at ({x}, {y})")
@@ -122,8 +122,7 @@ class BattleshipsEnv:
         # Return the updated agent's view, the reward, and whether the game is finished
         return self.agent_grid, reward, done
 
-    # TODO Rename this here and in `step`
-    def _step_reward_structure_(self, x, y):
+    def _compute_reward_for_hit(self, x, y):
         logging.info(f"Hit at ({x}, {y})!")
         self.agent_grid[x, y] = 1  # Mark as hit
         boat_id = self.grid[x, y]
