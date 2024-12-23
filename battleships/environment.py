@@ -92,7 +92,7 @@ class BattleshipsEnv:
         x, y = action
 
         # Validate action bounds
-        if not (0 <= x < self.grid_size and 0 <= y < self.grid_size):
+        if not 0 <= x < self.grid_size or not 0 <= y < self.grid_size:
             raise ValueError(f"Action {action} is out of bounds!")
 
         # Initialize reward
@@ -100,43 +100,7 @@ class BattleshipsEnv:
 
         # Check if the action hits a boat
         if any((x, y) in positions for positions in self.boat_positions.values()):
-            logging.info(f"Hit at ({x}, {y})!")
-            reward = 1  # Base reward for hitting a boat
-            self.agent_grid[x, y] = 1  # Mark as hit
-            boat_id = self.grid[x, y]
-
-            # Remove the hit cell from the boat's positions
-            logging.info(f"Removing ({x}, {y}) from boat {boat_id}")
-            self.boat_positions[boat_id].remove((x, y))
-
-            if not self.boat_positions[boat_id]:  # Check if the entire boat is sunk
-                logging.info(f"Boat {boat_id} has been sunk!")
-                reward += 10  # Bonus for sinking the boat
-                del self.boat_positions[boat_id]
-                self.previous_hit = None  # Reset previous hit if the boat is sunk
-                self.previous_hit_penalty = 0  # Reset penalty
-            else:
-                logging.info(f"Boat {boat_id} is still afloat!")
-                reward += 2  # Bonus for hitting part of a boat
-                self.previous_hit = (
-                    x,
-                    y,
-                    boat_id,
-                )  # Record the hit position and boat ID
-                self.previous_hit_penalty = (
-                    -1
-                )  # Initialize penalty for subsequent misses
-
-                # Add a small bonus for targeting adjacent cells of a hit
-                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    nx, ny = x + dx, y + dy
-                    if (
-                        0 <= nx < self.grid_size
-                        and 0 <= ny < self.grid_size
-                        and (nx, ny) in self.boat_positions[boat_id]
-                    ):
-                        reward += 0.5  # Adjacent bonus
-
+            reward = self._step_reward_structure_(x, y)
         else:
             # Action misses
             logging.info(f"Miss at ({x}, {y})")
@@ -157,6 +121,45 @@ class BattleshipsEnv:
 
         # Return the updated agent's view, the reward, and whether the game is finished
         return self.agent_grid, reward, done
+
+    # TODO Rename this here and in `step`
+    def _step_reward_structure_(self, x, y):
+        logging.info(f"Hit at ({x}, {y})!")
+        self.agent_grid[x, y] = 1  # Mark as hit
+        boat_id = self.grid[x, y]
+
+        # Remove the hit cell from the boat's positions
+        logging.info(f"Removing ({x}, {y}) from boat {boat_id}")
+        self.boat_positions[boat_id].remove((x, y))
+
+        result = 1
+        if not self.boat_positions[boat_id]:  # Check if the entire boat is sunk
+            logging.info(f"Boat {boat_id} has been sunk!")
+            result += 10
+            del self.boat_positions[boat_id]
+            self.previous_hit = None  # Reset previous hit if the boat is sunk
+            self.previous_hit_penalty = 0  # Reset penalty
+        else:
+            logging.info(f"Boat {boat_id} is still afloat!")
+            result += 2
+            self.previous_hit = (
+                x,
+                y,
+                boat_id,
+            )  # Record the hit position and boat ID
+            self.previous_hit_penalty = -1  # Initialize penalty for subsequent misses
+
+            # Add a small bonus for targeting adjacent cells of a hit
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if (
+                    0 <= nx < self.grid_size
+                    and 0 <= ny < self.grid_size
+                    and (nx, ny) in self.boat_positions[boat_id]
+                ):
+                    result += 0.5
+
+        return result
 
     def render(self):
         """
